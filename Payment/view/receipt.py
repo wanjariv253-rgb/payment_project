@@ -268,7 +268,7 @@ def download_receipt(request, txnid):
     pdf.drawCentredString(
         297,
         50,
-        "© All Rights Reserved | Designed by Virtual Galaxy Infotech"
+        "© All Rights Reserved | Designed by Berar Finance Limited"
     )
 
     # =========================
