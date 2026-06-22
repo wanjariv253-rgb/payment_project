@@ -149,6 +149,7 @@ PAYU_URL = config('PAYU_URL')
 PAYU_MIN_AMOUNT = config("PAYU_MIN_AMOUNT", cast=Decimal, default=Decimal("30.00"))
 PAYU_SUCCESS_URL = config('PAYU_SUCCESS_URL')
 PAYU_FAILURE_URL = config('PAYU_FAILURE_URL')   
+FRONTEND_URL = config('FRONTEND_URL')
 
 #Easebuzz
 

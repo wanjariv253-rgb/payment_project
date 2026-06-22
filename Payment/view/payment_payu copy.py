@@ -6,7 +6,7 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework import status
 from django.http import HttpResponse
-from django.shortcuts import redirect
+
 from Payment.serializers.payment_payu_serializer import TransactionInitiateSerializer
 from Payment.model.payment_payu import Transaction  
 from django.conf import settings
@@ -120,27 +120,19 @@ def payu_payment_callback(request):
         # Agar PayU se status 'success' aaya toh DB mein SUCCESS daalo, nahi toh FAILED
         if status_val and status_val.lower() == "success":
             transaction_obj.status = 'SUCCESS'
-            transaction_obj.save()
-
-            return redirect(
-                f"{settings.FRONTEND_URL}/payment-success?txnid={txnid}"
-            )
-
+            db_status = "SUCCESS"
+            api_response_status = "success"
         else:
             transaction_obj.status = 'FAILED'
-            transaction_obj.save()
+            db_status = "FAILED"
+            api_response_status = "failed"
 
-            return redirect(
-                f"{settings.FRONTEND_URL}/payment-failure?txnid={txnid}"
-            )
+        transaction_obj.save()
 
-        # transaction_obj.save()
-
-        # return Response({
-        #     "status": api_response_status,
-        #     "message": f"Transaction {txnid} marked as {db_status}."
-        # }, status=status.HTTP_200_OK)
+        return Response({
+            "status": api_response_status,
+            "message": f"Transaction {txnid} marked as {db_status}."
+        }, status=status.HTTP_200_OK)
 
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
