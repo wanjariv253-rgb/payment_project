@@ -13,7 +13,7 @@ class Transaction(models.Model):
     customer_name = models.CharField(max_length=100)
 
     email = models.EmailField()
-    phone = models.CharField(max_length=15)
+    phone = models.CharField(max_length=10)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     productinfo = models.TextField()
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDING')

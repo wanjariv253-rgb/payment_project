@@ -13,7 +13,7 @@ class Transaction_easebuzz(models.Model):
     loan_ac_no = models.CharField(max_length=50)
     city = models.CharField(max_length=100, null= True, blank= True)
     email = models.EmailField(verbose_name="Email")
-    phone = models.CharField(max_length=15, verbose_name="Phone Number")
+    phone = models.CharField(max_length=10, verbose_name="Phone Number")
     productinfo = models.TextField(verbose_name="Product Information")
     
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING', verbose_name="Transaction Status")

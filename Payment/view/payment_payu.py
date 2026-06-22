@@ -102,14 +102,12 @@ def payu_payment_callback(request):
         if not txnid or not status_val:
             return Response({"error": "Data incomplete hai!"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 2. Reverse Hash Verification (Dono cases ke liye secure check)
         reverse_hash_string = f"{PAYU_SALT}|{status_val}|||||||||||{email}|{customer_name}|{productinfo}|{amount}|{txnid}|{key}"
         calculated_hash = hashlib.sha512(reverse_hash_string.encode('utf-8')).hexdigest().lower()
 
         if calculated_hash != payu_hash:
             return Response({"error": "Hash Mismatch! Security block."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 3. Database se transaction record uthao
         try:
             transaction_obj = Transaction.objects.get(txnid=txnid)
         except Transaction.objects.DoesNotExist:
@@ -117,8 +115,6 @@ def payu_payment_callback(request):
         
         amount = transaction_obj.amount
         
-        # 4. DYNAMIC STATUS UPDATE (If-Else ka short logic)
-        # Agar PayU se status 'success' aaya toh DB mein SUCCESS daalo, nahi toh FAILED
         if status_val and status_val.lower() == "success":
             transaction_obj.status = 'SUCCESS'
             transaction_obj.save()
@@ -136,13 +132,6 @@ def payu_payment_callback(request):
                 f"{settings.FRONTEND_URL}/payment-failure?"
                 f"txnid={txnid}&amount={amount}"
             )
-
-        # transaction_obj.save()
-
-        # return Response({
-        #     "status": api_response_status,
-        #     "message": f"Transaction {txnid} marked as {db_status}."
-        # }, status=status.HTTP_200_OK)
 
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
