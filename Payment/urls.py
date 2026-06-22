@@ -1,6 +1,7 @@
 from django.urls import path
 from Payment.view.payment_easebuzz import easebuzz_payment_callback, generate_easebuzz_link
 from Payment.view.payment_payu import generate_payment_link, payu_payment_callback
+from Payment.view.receipt import download_receipt
 from Payment.view.test_data import loan_details_test
 
 urlpatterns = [
@@ -10,4 +11,5 @@ urlpatterns = [
     path('easebuzz_payment/', generate_easebuzz_link, name='easebuzz-initiate'),
     path('easebuzz_callback/', easebuzz_payment_callback, name='easebuzz-callback'),
     path('loan_details/', loan_details_test, name='loan-details-test'),
+    path( 'receipt/<str:txnid>/', download_receipt, name='download_receipt' ),
 ]
