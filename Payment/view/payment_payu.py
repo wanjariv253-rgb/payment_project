@@ -114,7 +114,9 @@ def payu_payment_callback(request):
             transaction_obj = Transaction.objects.get(txnid=txnid)
         except Transaction.objects.DoesNotExist:
             return Response({"error": "Transaction not found in Database"}, status=status.HTTP_404_NOT_FOUND)
-
+        
+        amount = transaction_obj.amount
+        
         # 4. DYNAMIC STATUS UPDATE (If-Else ka short logic)
         # Agar PayU se status 'success' aaya toh DB mein SUCCESS daalo, nahi toh FAILED
         if status_val and status_val.lower() == "success":
@@ -122,7 +124,8 @@ def payu_payment_callback(request):
             transaction_obj.save()
 
             return redirect(
-                f"{settings.FRONTEND_URL}/payment-success?txnid={txnid}"
+                f"{settings.FRONTEND_URL}/payment-success?"
+                f"txnid={txnid}&amount={amount}"
             )
 
         else:
@@ -130,7 +133,8 @@ def payu_payment_callback(request):
             transaction_obj.save()
 
             return redirect(
-                f"{settings.FRONTEND_URL}/payment-failure?txnid={txnid}"
+                f"{settings.FRONTEND_URL}/payment-failure?"
+                f"txnid={txnid}&amount={amount}"
             )
 
         # transaction_obj.save()

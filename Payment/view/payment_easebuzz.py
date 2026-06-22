@@ -152,14 +152,18 @@ def easebuzz_payment_callback(request):
             transaction_obj = Transaction_easebuzz.objects.get(txnid=txnid)
         except Transaction_easebuzz.objects.DoesNotExist:
             return Response({"error": "Transaction ID is not in Database"}, status=status.HTTP_404_NOT_FOUND)
-
+        amount = transaction_obj.amount
+        
         # Dynamic mapping for status
         if status_val and status_val.lower() == "success":
             transaction_obj.status = 'SUCCESS'
             transaction_obj.save()
 
             return redirect(
-                f"{settings.FRONTEND_URL}/payment-success?txnid={txnid}&gateway=easebuzz"
+                f"{settings.FRONTEND_URL}/payment-success?"
+                f"txnid={txnid}"
+                f"&amount={amount}"
+                f"&gateway=easebuzz"
             )
 
         else:
@@ -167,7 +171,10 @@ def easebuzz_payment_callback(request):
             transaction_obj.save()
 
             return redirect(
-                f"{settings.FRONTEND_URL}/payment-failure?txnid={txnid}&gateway=easebuzz"
+                f"{settings.FRONTEND_URL}/payment-failure?"
+                f"txnid={txnid}"
+                f"&amount={amount}"
+                f"&gateway=easebuzz"
             )
 
         # transaction_obj.save()
