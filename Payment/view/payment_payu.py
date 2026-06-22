@@ -43,8 +43,7 @@ def generate_payment_link(request):
         # Callback Endpoints
         surl = settings.PAYU_SUCCESS_URL
         furl = settings.PAYU_FAILURE_URL
-        print("SUCCESS URL:", settings.PAYU_SUCCESS_URL)
-        print("FAILURE URL:", settings.PAYU_FAILURE_URL)
+
 
         # Cryptographic Hash
         hash_string = f"{PAYU_KEY}|{txnid}|{amount}|{productinfo}|{customer_name}|{email}|||||||||||{PAYU_SALT}"

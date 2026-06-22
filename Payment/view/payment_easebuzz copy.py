@@ -8,7 +8,7 @@ from rest_framework import status
 from django.conf import settings
 from Payment.model.payment_easebuzz import Transaction_easebuzz  
 from Payment.serializers.payment_easebuzz_serializers import TransactionEasebuzzSerializer
-from django.shortcuts import redirect
+
 # Exact Easebuzz Sandbox Credentials
 MERCHANT_KEY = settings.EASEBUZZ_MERCHANT_KEY
 SALT = settings.EASEBUZZ_SALT
@@ -156,27 +156,19 @@ def easebuzz_payment_callback(request):
         # Dynamic mapping for status
         if status_val and status_val.lower() == "success":
             transaction_obj.status = 'SUCCESS'
-            transaction_obj.save()
-
-            return redirect(
-                f"{settings.FRONTEND_URL}/payment-success?txnid={txnid}&gateway=easebuzz"
-            )
-
+            db_status = "SUCCESS"
+            api_status = "success"
         else:
             transaction_obj.status = 'FAILED'
-            transaction_obj.save()
+            db_status = "FAILED"
+            api_status = "failed"
 
-            return redirect(
-                f"{settings.FRONTEND_URL}/payment-failure?txnid={txnid}&gateway=easebuzz"
-            )
+        transaction_obj.save()
 
-        # transaction_obj.save()
-
-        # return Response({
-        #     "status": api_status,
-        #     "message": f"Easebuzz Transaction {txnid} marked as {db_status} in DB."
-        # }, status=status.HTTP_200_OK)
+        return Response({
+            "status": api_status,
+            "message": f"Easebuzz Transaction {txnid} marked as {db_status} in DB."
+        }, status=status.HTTP_200_OK)
     
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
