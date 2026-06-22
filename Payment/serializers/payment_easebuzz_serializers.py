@@ -7,10 +7,16 @@ from Payment.utils.sanitizer import sanitize_input
 class TransactionEasebuzzSerializer(serializers.ModelSerializer):
     class Meta:
         model = Transaction_easebuzz
-        fields = ['amount', 'firstname', 'email', 'phone', 'productinfo']
+        fields = [ 'loan_ac_no', 'customer_name', 'city', 'amount', 'email', 'phone', 'productinfo' ]
         
-    def validate_firstname(self, value):
-        return sanitize_input(value, "firstname")
+    def validate_customer_name(self, value):
+        return sanitize_input(value, "customer_name")
+    
+    def validate_city(self, value):
+     return sanitize_input(value, "city")
+ 
+    def validate_loan_ac_no(self, value):
+        return sanitize_input(value, "loan_ac_no")
 
     def validate_productinfo(self, value):
         return sanitize_input(value, "productinfo")

@@ -10,7 +10,6 @@ class Transaction(models.Model):
     txnid = models.CharField(max_length=100, unique=True)
     loan_ac_no = models.CharField(max_length=50)
     city = models.CharField(max_length=100, null= True, blank= True)
-    # firstname = models.CharField(max_length=100)
     customer_name = models.CharField(max_length=100)
 
     email = models.EmailField()

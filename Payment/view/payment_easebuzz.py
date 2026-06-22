@@ -28,8 +28,10 @@ def generate_easebuzz_link(request):
         
         # 1. Clean Data Extraction
         validated_data = serializer.validated_data
-        amount = f"{float(validated_data['amount']):.2f}"  # Strongly 2 decimal format (e.g., 100.00)
-        firstname = str(validated_data['firstname']).strip()
+        loan_ac_no = str(validated_data['loan_ac_no']).strip()
+        city = str(validated_data['city']).strip()
+        amount = f"{float(validated_data['amount']):.2f}"
+        customer_name = str(validated_data['customer_name']).strip()
         email = str(validated_data['email']).strip()
         phone = str(validated_data['phone']).strip()
         productinfo = str(validated_data['productinfo']).strip()
@@ -46,7 +48,7 @@ def generate_easebuzz_link(request):
 
         # 2. Strict Hash String Construction (Pure 10 UDF Slots Pattern)
         # Formula: key|txnid|amount|productinfo|firstname|email|udf1|udf2|udf3|udf4|udf5|udf6|udf7|udf8|udf9|udf10|salt
-        hash_string = f"{MERCHANT_KEY}|{txnid}|{amount}|{productinfo}|{firstname}|{email}|{udf1}|{udf2}|{udf3}|{udf4}|{udf5}|{udf6}|{udf7}|{udf8}|{udf9}|{udf10}|{SALT}"
+        hash_string = f"{MERCHANT_KEY}|{txnid}|{amount}|{productinfo}|{customer_name}|{email}|{udf1}|{udf2}|{udf3}|{udf4}|{udf5}|{udf6}|{udf7}|{udf8}|{udf9}|{udf10}|{SALT}"
         generated_hash = hashlib.sha512(hash_string.encode('utf-8')).hexdigest().lower()
 
         # 3. Form Payload (Form-Urlencoded mapping matches exactly)
@@ -55,7 +57,7 @@ def generate_easebuzz_link(request):
             "txnid": str(txnid),
             "amount": str(amount),
             "productinfo": str(productinfo),
-            "firstname": str(firstname),
+            "firstname": str(customer_name),
             "email": str(email),
             "phone": str(phone),
             "surl": str(callback_url),
@@ -113,9 +115,9 @@ def easebuzz_payment_callback(request):
     try:
         txnid = request.data.get('txnid')
         easebuzz_hash = request.data.get('hash')
-        status_val = request.data.get('status')  # Khushkhabri ya dukh khabar ('success' / 'failure')
+        status_val = request.data.get('status')  
         amount = request.data.get('amount')
-        firstname = request.data.get('firstname')
+        customer_name = request.data.get('firstname')
         email = request.data.get('email')
         productinfo = request.data.get('productinfo')
         key = request.data.get('key')
@@ -139,7 +141,7 @@ def easebuzz_payment_callback(request):
         f"{SALT}|{status_val}|"
         f"{udf10}|{udf9}|{udf8}|{udf7}|{udf6}|"
         f"{udf5}|{udf4}|{udf3}|{udf2}|{udf1}|"
-        f"{email}|{firstname}|{productinfo}|{amount}|{txnid}|{key}"
+        f"{email}|{customer_name}|{productinfo}|{amount}|{txnid}|{key}"
         )
         calculated_hash = hashlib.sha512(reverse_hash_string.encode('utf-8')).hexdigest().lower()        
         if calculated_hash != easebuzz_hash:
