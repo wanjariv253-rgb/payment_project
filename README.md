@@ -19,3 +19,11 @@ Make sure you have requirements.txt, then run:
 
 If you don’t have requirements.txt yet, generate it with:
   pip freeze > requirements.txt
+
+For Download Receipt
+  pip install reportlab
+
+Migrations
+  python manage.py makemigrations
+  python manage.py migrate
+  python manage.py runserver
