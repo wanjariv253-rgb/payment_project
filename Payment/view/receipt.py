@@ -1,3 +1,4 @@
+from datetime import datetime
 from django.http import HttpResponse
 from reportlab.pdfgen import canvas
 from reportlab.lib.colors import HexColor
@@ -264,11 +265,12 @@ def download_receipt(request, txnid):
     # =========================
     pdf.setFillColor(text_muted)
     pdf.setFont("Helvetica", 8)
+    current_year = datetime.now().year
 
     pdf.drawCentredString(
-        297,
-        50,
-        "© All Rights Reserved | Designed by Berar Finance Limited"
+    297,
+    50,
+    f"© {current_year} | All Rights Reserved | Designed by Berar Finance Limited"
     )
 
     # =========================
