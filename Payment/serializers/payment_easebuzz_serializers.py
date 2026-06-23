@@ -1,3 +1,5 @@
+import re
+
 from rest_framework import serializers
 from django.conf import settings
 from Payment.model.payment_easebuzz import Transaction_easebuzz
@@ -22,14 +24,34 @@ class TransactionEasebuzzSerializer(serializers.ModelSerializer):
         return sanitize_input(value, "productinfo")
 
     def validate_email(self, value):
-        return sanitize_input(value, "email")
+        value = sanitize_input(value, "email")
+
+        email_pattern = r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'
+
+        if not re.match(email_pattern, value):
+            raise serializers.ValidationError(
+                "Enter a valid email address."
+            )
+
+        return value
 
     def validate_phone(self, value):
-        return sanitize_input(value, "phone")
+        value = sanitize_input(value, "phone")
+
+        if not re.match(r'^[6-9]\d{9}$', value):
+            raise serializers.ValidationError(
+                "Enter a valid 10 digit mobile number."
+            )
+
+        if len(set(value)) == 1:
+            raise serializers.ValidationError(
+                "Invalid mobile number."
+            )
+
+        return value
     
     def validate_amount(self, value):
         min_amount = settings.EASEBUZZ_MIN_AMOUNT
-
         value = float(value)
 
         if value <= float(min_amount):

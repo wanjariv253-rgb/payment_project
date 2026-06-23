@@ -27,3 +27,4 @@ class Transaction_easebuzz(models.Model):
 
     def __str__(self):
         return f"{self.txnid} - {self.status}"
+    

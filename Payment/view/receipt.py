@@ -270,7 +270,7 @@ def download_receipt(request, txnid):
     pdf.drawCentredString(
     297,
     50,
-    f"© {current_year} | All Rights Reserved | Designed by Berar Finance Limited"
+    f"© {current_year} | All Rights Reserved | Terms and Conditions | Cancellation and Refund Policy | Designed & Developed by Berar Finance Limited"
     )
 
     # =========================

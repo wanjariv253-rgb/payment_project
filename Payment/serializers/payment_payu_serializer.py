@@ -3,7 +3,7 @@ from Payment.model.payment_payu import Transaction
 from Payment.utils.sanitizer import sanitize_input
 from django.conf import settings
 from decimal import Decimal
-
+import re
 class TransactionInitiateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Transaction
@@ -19,10 +19,31 @@ class TransactionInitiateSerializer(serializers.ModelSerializer):
         return sanitize_input(value, "loan_ac_no")
     
     def validate_email(self, value):
-        return sanitize_input(value, "email")
+        value = sanitize_input(value, "email")
+
+        email_pattern = r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'
+
+        if not re.match(email_pattern, value):
+            raise serializers.ValidationError(
+                "Enter a valid email address."
+            )
+
+        return value
 
     def validate_phone(self, value):
-        return sanitize_input(value, "phone")
+        value = sanitize_input(value, "phone")
+
+        if not re.match(r'^[6-9]\d{9}$', value):
+            raise serializers.ValidationError(
+                "Enter a valid 10 digit mobile number."
+            )
+
+        if len(set(value)) == 1:
+            raise serializers.ValidationError(
+                "Invalid mobile number."
+            )
+
+        return value
 
     def validate_productinfo(self, value):
         return sanitize_input(value, "productinfo")
