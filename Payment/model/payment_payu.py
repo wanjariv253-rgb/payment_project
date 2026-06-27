@@ -1,5 +1,7 @@
 from django.db import models
 
+from Payment.model.get_payment import GetPayment
+
 class Transaction(models.Model):
     STATUS_CHOICES = [
         ('PENDING', 'Pending'),
@@ -7,6 +9,13 @@ class Transaction(models.Model):
         ('FAILED', 'Failed'),
     ]
 
+    payment_log = models.ForeignKey(
+        GetPayment, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='payu_transactions'
+    )
     txnid = models.CharField(max_length=100, unique=True)
     loan_ac_no = models.CharField(max_length=50)
     city = models.CharField(max_length=100, null= True, blank= True)

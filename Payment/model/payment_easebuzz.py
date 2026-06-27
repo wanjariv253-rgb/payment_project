@@ -1,5 +1,7 @@
 from django.db import models
 
+from Payment.model.get_payment import GetPayment
+
 class Transaction_easebuzz(models.Model):
     STATUS_CHOICES = [
         ('PENDING', 'Pending'),
@@ -7,6 +9,13 @@ class Transaction_easebuzz(models.Model):
         ('FAILED', 'Failed'),
     ]
 
+    payment_log = models.ForeignKey(
+        GetPayment, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='easebuzz_transactions'
+    )
     txnid = models.CharField(max_length=100, unique=True, verbose_name="Transaction ID")
     amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Amount")
     customer_name = models.CharField(max_length=100, verbose_name="First Name")

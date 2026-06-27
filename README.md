@@ -54,7 +54,8 @@ pip install -r requirements.txt
 If requirements.txt is not available:
 
 ```bash
-pip freeze > requirements.txt
+
+
 ```
 
 ---

@@ -5,15 +5,10 @@ from rest_framework.decorators import api_view, parser_classes
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework import status
-from django.shortcuts import redirect
 from django.conf import settings
-
-# Models, Serializers aur Services Imports
 from Payment.model.payment_easebuzz import Transaction_easebuzz  
 from Payment.serializers.payment_easebuzz_serializers import TransactionEasebuzzSerializer
-from Payment.model.get_payment import GetPayment
-from Payment.constants import PaymentLogTypes
-from Payment.services.all_cloud_service import AllCloudService # Sahi path se import karna
+from django.shortcuts import redirect
 
 # Exact Easebuzz Sandbox Credentials
 MERCHANT_KEY = settings.EASEBUZZ_MERCHANT_KEY
@@ -25,9 +20,6 @@ BASE_URL = (
     else settings.EASEBUZZ_TEST_URL
 )
 
-# ========================================================
-# 1. GENERATE PAYMENT LINK FOR EASEBUZZ
-# ========================================================
 @api_view(['POST'])
 def generate_easebuzz_link(request):
     try:
@@ -35,7 +27,7 @@ def generate_easebuzz_link(request):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
-        # Clean Data Extraction
+        # 1. Clean Data Extraction
         validated_data = serializer.validated_data
         loan_ac_no = str(validated_data['loan_ac_no']).strip()
         city = str(validated_data['city']).strip()
@@ -45,27 +37,9 @@ def generate_easebuzz_link(request):
         phone = str(validated_data['phone']).strip()
         productinfo = str(validated_data['productinfo']).strip()
 
-        # ------------------------------------------------------------------
-        # 📑 STEP 1: payment_logs Table Me Entry Banao (Type 3)
-        # ------------------------------------------------------------------
-        db_log = GetPayment.objects.create(
-            type=PaymentLogTypes.POST_LOAN_DETAILS,  # "PostLoanDetails"
-            request_payload=request.data,            # Frontend se aaya pura payload
-            response_payload={"info": "Initiating Easebuzz handshake..."},
-            status_code=201
-        )
-
         # Unique Txn ID aur DB Entry
         txnid = f"EB{uuid.uuid4().hex[:10].upper()}"
-        
-        # ------------------------------------------------------------------
-        # 📑 STEP 2: Save Data into payment_easebuzz with Foreign Key (payment_log)
-        # ------------------------------------------------------------------
-        serializer.save(
-            txnid=txnid, 
-            status='PENDING',
-            payment_log=db_log  # Centralized audit log link ho gaya!
-        )
+        serializer.save(txnid=txnid, status='PENDING')
         
         # Unified callback endpoint
         callback_url = settings.EASEBUZZ_CALLBACK_URL
@@ -73,11 +47,12 @@ def generate_easebuzz_link(request):
         # Easebuzz demands all 10 UDF slots to be present for correct pipe counting
         udf1 = udf2 = udf3 = udf4 = udf5 = udf6 = udf7 = udf8 = udf9 = udf10 = ""
 
-        # Cryptographic Hash String Construction
+        # 2. Strict Hash String Construction (Pure 10 UDF Slots Pattern)
+        # Formula: key|txnid|amount|productinfo|firstname|email|udf1|udf2|udf3|udf4|udf5|udf6|udf7|udf8|udf9|udf10|salt
         hash_string = f"{MERCHANT_KEY}|{txnid}|{amount}|{productinfo}|{customer_name}|{email}|{udf1}|{udf2}|{udf3}|{udf4}|{udf5}|{udf6}|{udf7}|{udf8}|{udf9}|{udf10}|{SALT}"
         generated_hash = hashlib.sha512(hash_string.encode('utf-8')).hexdigest().lower()
 
-        # Payload Structure
+        # 3. Form Payload (Form-Urlencoded mapping matches exactly)
         payload = {
             "key": str(MERCHANT_KEY).strip(),
             "txnid": str(txnid),
@@ -111,17 +86,10 @@ def generate_easebuzz_link(request):
                 "raw_body": eb_response.text
             }, status=status.HTTP_502_BAD_GATEWAY)
 
-        # Token handling & URL routing
+        # 4. Token handling
         if response_json.get("status") == 1:
             access_key = response_json.get("data")
             checkout_url = f"{BASE_URL}/pay/{access_key}"
-            
-            # 📑 Audit log me update kar do ki link ban gaya
-            db_log.response_payload = {
-                "easebuzz_handshake_status": "TOKEN_GENERATED",
-                "payment_url": checkout_url
-            }
-            db_log.save()
             
             return Response({
                 "status": "success",
@@ -129,10 +97,6 @@ def generate_easebuzz_link(request):
                 "payment_url": checkout_url
             }, status=status.HTTP_201_CREATED)
         else:
-            db_log.status_code = 400
-            db_log.response_payload = {"error": "Easebuzz rejection", "details": response_json}
-            db_log.save()
-            
             return Response({
                 "error": "Easebuzz token initiation failed", 
                 "details": response_json
@@ -148,6 +112,7 @@ def generate_easebuzz_link(request):
 @api_view(['POST'])
 @parser_classes([FormParser, MultiPartParser])
 def easebuzz_payment_callback(request):
+
     try:
         txnid = request.data.get('txnid')
         easebuzz_hash = request.data.get('hash')
@@ -172,12 +137,12 @@ def easebuzz_payment_callback(request):
         if not txnid or not status_val:
             return Response({"error": "Data is Incomplete"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Reverse Hash Formula Check
+        # Reverse Hash Formula: salt|status|udf5|udf4|udf3|udf2|udf1|email|firstname|productinfo|amount|txnid|key
         reverse_hash_string = (
-            f"{SALT}|{status_val}|"
-            f"{udf10}|{udf9}|{udf8}|{udf7}|{udf6}|"
-            f"{udf5}|{udf4}|{udf3}|{udf2}|{udf1}|"
-            f"{email}|{customer_name}|{productinfo}|{amount}|{txnid}|{key}"
+        f"{SALT}|{status_val}|"
+        f"{udf10}|{udf9}|{udf8}|{udf7}|{udf6}|"
+        f"{udf5}|{udf4}|{udf3}|{udf2}|{udf1}|"
+        f"{email}|{customer_name}|{productinfo}|{amount}|{txnid}|{key}"
         )
         calculated_hash = hashlib.sha512(reverse_hash_string.encode('utf-8')).hexdigest().lower()        
         if calculated_hash != easebuzz_hash:
@@ -188,62 +153,31 @@ def easebuzz_payment_callback(request):
             transaction_obj = Transaction_easebuzz.objects.get(txnid=txnid)
         except Transaction_easebuzz.objects.DoesNotExist:
             return Response({"error": "Transaction ID is not in Database"}, status=status.HTTP_404_NOT_FOUND)
-            
         amount = transaction_obj.amount
         
-        # ------------------------------------------------------------------
-        # 🤝 STEP 3: Handle Status and Sync with AllCloud on SUCCESS
-        # ------------------------------------------------------------------
+        # Dynamic mapping for status
         if status_val and status_val.lower() == "success":
             transaction_obj.status = 'SUCCESS'
             transaction_obj.save()
 
-            # Dynamic log status update
-            if transaction_obj.payment_log:
-                db_log = transaction_obj.payment_log
-                db_log.status_code = 200
-                db_log.save()
-
-                # AllCloud Repayment Payload setup
-                allcloud_payload = {
-                    "AgreementNumber": transaction_obj.loan_ac_no,
-                    "Amount": float(transaction_obj.amount),
-                    "CustomerName": transaction_obj.customer_name,
-                    "Email": transaction_obj.email,
-                    "MobileNo": transaction_obj.phone,
-                    "VoucherNo": f"VCH-{txnid}",
-                    "Notes": f"Paid successfully via Easebuzz. Log ID: {db_log.id}"
-                }
-
-                # 🔥 Directly Calling your Service Classmethod
-                ac_response, ac_error = AllCloudService.save_repayment(allcloud_payload)
-
-                # Tracking responses inside the centralized logs
-                if ac_response:
-                    db_log.response_payload = {"allcloud_status": "SYNCED", "data": ac_response}
-                else:
-                    db_log.response_payload = {"allcloud_status": "FAILED_TO_SYNC", "error": ac_error}
-                db_log.save()
-
             return redirect(
                 f"{settings.FRONTEND_URL}/payment-success?"
-                f"txnid={txnid}&amount={amount}&gateway=easebuzz"
+                f"txnid={txnid}"
+                f"&amount={amount}"
+                f"&gateway=easebuzz"
             )
 
         else:
             transaction_obj.status = 'FAILED'
             transaction_obj.save()
 
-            if transaction_obj.payment_log:
-                db_log = transaction_obj.payment_log
-                db_log.status_code = 400
-                db_log.response_payload = {"error": "Easebuzz declared payment failure", "raw_callback": request.data}
-                db_log.save()
-
             return redirect(
                 f"{settings.FRONTEND_URL}/payment-failure?"
-                f"txnid={txnid}&amount={amount}&gateway=easebuzz"
+                f"txnid={txnid}"
+                f"&amount={amount}"
+                f"&gateway=easebuzz"
             )
     
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    

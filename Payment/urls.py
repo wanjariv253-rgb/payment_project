@@ -1,4 +1,5 @@
 from django.urls import path
+from Payment.view.all_cloud_view import FetchRepaymentAPIView
 from Payment.view.payment_easebuzz import easebuzz_payment_callback, generate_easebuzz_link
 from Payment.view.payment_payu import generate_payment_link, payu_payment_callback
 from Payment.view.receipt import download_receipt
@@ -12,4 +13,7 @@ urlpatterns = [
     path('easebuzz_callback/', easebuzz_payment_callback, name='easebuzz-callback'),
     path('loan_details/', loan_details_test, name='loan-details-test'),
     path( 'receipt/<str:txnid>/', download_receipt, name='download_receipt' ),
+    
+    path('loan-details_fetch/', FetchRepaymentAPIView.as_view(), name='repayment-api'),
+    # path('loan-details_submit/', CreatePaymentLogAPIView.as_view(), name='repayment-api'),
 ]
