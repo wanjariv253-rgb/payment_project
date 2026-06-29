@@ -8,3 +8,5 @@ class PaymentLogTypes:
     AUTH_TOKEN = "Auth Token"             # Type 1: Token Generation API
     GET_LOAN_DETAILS = "GetLoanDetails"   # Type 2: AllCloud se details fetch karna
     POST_LOAN_DETAILS = "PostLoanDetails"
+
+DEFAULT_PRODUCT_INFO = "PL"

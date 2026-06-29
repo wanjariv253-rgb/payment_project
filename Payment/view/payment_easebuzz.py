@@ -7,13 +7,13 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import redirect
 from django.conf import settings
-
+import datetime
 # Models, Serializers aur Services Imports
 from Payment.model.payment_easebuzz import Transaction_easebuzz  
 from Payment.serializers.payment_easebuzz_serializers import TransactionEasebuzzSerializer
 from Payment.model.get_payment import GetPayment
-from Payment.constants import PaymentLogTypes
-from Payment.services.all_cloud_service import AllCloudService # Sahi path se import karna
+from Payment.constants import PaymentLogTypes, DEFAULT_PRODUCT_INFO
+from Payment.services.all_cloud_service import AllCloudService
 
 # Exact Easebuzz Sandbox Credentials
 MERCHANT_KEY = settings.EASEBUZZ_MERCHANT_KEY
@@ -37,34 +37,45 @@ def generate_easebuzz_link(request):
         
         # Clean Data Extraction
         validated_data = serializer.validated_data
-        loan_ac_no = str(validated_data['loan_ac_no']).strip()
-        city = str(validated_data['city']).strip()
         amount = f"{float(validated_data['amount']):.2f}"
-        customer_name = str(validated_data['customer_name']).strip()
-        email = str(validated_data['email']).strip()
-        phone = str(validated_data['phone']).strip()
-        productinfo = str(validated_data['productinfo']).strip()
 
-        # ------------------------------------------------------------------
-        # 📑 STEP 1: payment_logs Table Me Entry Banao (Type 3)
-        # ------------------------------------------------------------------
+        # 🔄 FRONTEND SE PARENT LOG ID NIKALI
+        parent_id = request.data.get('parent_log_id')
+
+        # 🤝 Product info ko constants.py ke default fallback se set kiya agar frontend se na aaye
+        product_info_val = validated_data.get('productinfo') or DEFAULT_PRODUCT_INFO
+
+        # 🎯 CUSTOM PAYLOAD STRUCTURE FOR LOGS (Jaise PayU me banaya tha)
+        indian_now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=5, minutes=30)))
+        init_date = indian_now.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3]
+
+        custom_log_payload = {
+            "ChartOfAccountId": int(settings.ALLCLOUD_CHART_OF_ACCOUNT_ID),
+            "AgreementNumber": validated_data.get('loan_ac_no'),  
+            "ReceivedDate": init_date,  # 🔥 Shuruat me hi Indian Init Time chala gaya
+            "Amount": float(amount),
+            "LoanReceiptMode": 2,                                 
+            "PolicyPaymentTypeId": settings.ALLCLOUD_POLICY_PAYMENT_TYPE_ID
+        }
+
+        # 📑 STEP 1: Central log me custom format ke sath record banaya
         db_log = GetPayment.objects.create(
-            type=PaymentLogTypes.POST_LOAN_DETAILS,  # "PostLoanDetails"
-            request_payload=request.data,            # Frontend se aaya pura payload
+            parent_id=parent_id,                     
+            type=PaymentLogTypes.POST_LOAN_DETAILS,  
+            request_payload=custom_log_payload,            
             response_payload={"info": "Initiating Easebuzz handshake..."},
             status_code=201
         )
 
-        # Unique Txn ID aur DB Entry
+        # Unique Txn ID
         txnid = f"EB{uuid.uuid4().hex[:10].upper()}"
         
-        # ------------------------------------------------------------------
-        # 📑 STEP 2: Save Data into payment_easebuzz with Foreign Key (payment_log)
-        # ------------------------------------------------------------------
+        # 📑 STEP 2: Save Data into payment_easebuzz with Foreign Key & Fallback Product Info
         serializer.save(
             txnid=txnid, 
             status='PENDING',
-            payment_log=db_log  # Centralized audit log link ho gaya!
+            payment_log=db_log,
+            productinfo=product_info_val
         )
         
         # Unified callback endpoint
@@ -73,8 +84,8 @@ def generate_easebuzz_link(request):
         # Easebuzz demands all 10 UDF slots to be present for correct pipe counting
         udf1 = udf2 = udf3 = udf4 = udf5 = udf6 = udf7 = udf8 = udf9 = udf10 = ""
 
-        # Cryptographic Hash String Construction
-        hash_string = f"{MERCHANT_KEY}|{txnid}|{amount}|{productinfo}|{customer_name}|{email}|{udf1}|{udf2}|{udf3}|{udf4}|{udf5}|{udf6}|{udf7}|{udf8}|{udf9}|{udf10}|{SALT}"
+        # Cryptographic Hash String Construction using product_info_val constant
+        hash_string = f"{MERCHANT_KEY}|{txnid}|{amount}|{product_info_val}|{validated_data['customer_name']}|{validated_data['email']}|{udf1}|{udf2}|{udf3}|{udf4}|{udf5}|{udf6}|{udf7}|{udf8}|{udf9}|{udf10}|{SALT}"
         generated_hash = hashlib.sha512(hash_string.encode('utf-8')).hexdigest().lower()
 
         # Payload Structure
@@ -82,10 +93,10 @@ def generate_easebuzz_link(request):
             "key": str(MERCHANT_KEY).strip(),
             "txnid": str(txnid),
             "amount": str(amount),
-            "productinfo": str(productinfo),
-            "firstname": str(customer_name),
-            "email": str(email),
-            "phone": str(phone),
+            "productinfo": str(product_info_val),
+            "firstname": str(validated_data['customer_name']).strip(),
+            "email": str(validated_data['email']).strip(),
+            "phone": str(validated_data['phone']).strip(),
             "surl": str(callback_url),
             "furl": str(callback_url),
             "hash": str(generated_hash),
@@ -196,33 +207,47 @@ def easebuzz_payment_callback(request):
         # ------------------------------------------------------------------
         if status_val and status_val.lower() == "success":
             transaction_obj.status = 'SUCCESS'
-            transaction_obj.save()
+            transaction_obj.save()  # 🔥 updated_at automatic local Indian time ke sath save ho gaya
 
             # Dynamic log status update
             if transaction_obj.payment_log:
                 db_log = transaction_obj.payment_log
                 db_log.status_code = 200
-                db_log.save()
+                
+                # 🇮🇳 Exact Indian Time Nikala Table Record se aur fractional seconds trim kiya
+                local_indian_time = transaction_obj.updated_at.replace(tzinfo=None)
+                clean_date = local_indian_time.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3]
 
-                # AllCloud Repayment Payload setup
+                # 🔄 1. DB LOG KE REQUEST PAYLOAD ME REPAYMENT TIME STAMP UPDATE KIYA
+                current_payload = db_log.request_payload
+                if isinstance(current_payload, dict):
+                    current_payload["ReceivedDate"] = clean_date  
+                    db_log.request_payload = current_payload
+                
+                # 🔥 AllCloud Service ko call karne se pehle cache update committed kiya
+                db_log.save() 
+
+                # 🚀 AllCloud Repayment Payload (Ab exact PayU wale formats me mapping)
                 allcloud_payload = {
-                    "AgreementNumber": transaction_obj.loan_ac_no,
                     "Amount": float(transaction_obj.amount),
-                    "CustomerName": transaction_obj.customer_name,
-                    "Email": transaction_obj.email,
-                    "MobileNo": transaction_obj.phone,
-                    "VoucherNo": f"VCH-{txnid}",
-                    "Notes": f"Paid successfully via Easebuzz. Log ID: {db_log.id}"
+                    "ReceivedDate": clean_date,                          # 🔥 Ekdum saaf localized datetime string
+                    "AgreementNumber": transaction_obj.loan_ac_no,
+                    "LoanReceiptMode": 2,                
+                    "ChartOfAccountId": int(settings.ALLCLOUD_CHART_OF_ACCOUNT_ID),           
+                    "PolicyPaymentTypeId": settings.ALLCLOUD_POLICY_PAYMENT_TYPE_ID  
                 }
 
-                # 🔥 Directly Calling your Service Classmethod
-                ac_response, ac_error = AllCloudService.save_repayment(allcloud_payload)
+                # 🔥 Service class method call with parent_id for multi-user security mapping
+                ac_response, ac_error = AllCloudService.save_repayment(allcloud_payload, parent_id=db_log.parent_id)
 
                 # Tracking responses inside the centralized logs
                 if ac_response:
-                    db_log.response_payload = {"allcloud_status": "SYNCED", "data": ac_response}
+                    db_log.response_payload = ac_response  # 🔥 Storing raw third-party json response direct
                 else:
-                    db_log.response_payload = {"allcloud_status": "FAILED_TO_SYNC", "error": ac_error}
+                    db_log.response_payload = {
+                        "status": "success",
+                        "response": f"transaction with {txnid} for amount {transaction_obj.amount} is success but AllCloud sync failed: {ac_error}"
+                    }
                 db_log.save()
 
             return redirect(
@@ -230,6 +255,7 @@ def easebuzz_payment_callback(request):
                 f"txnid={txnid}&amount={amount}&gateway=easebuzz"
             )
 
+        # ❌ Agar Payment FAIL hui hai (FURL)
         else:
             transaction_obj.status = 'FAILED'
             transaction_obj.save()
@@ -237,7 +263,13 @@ def easebuzz_payment_callback(request):
             if transaction_obj.payment_log:
                 db_log = transaction_obj.payment_log
                 db_log.status_code = 400
-                db_log.response_payload = {"error": "Easebuzz declared payment failure", "raw_callback": request.data}
+                
+                # 🎯 Centralized raw error status update
+                db_log.response_payload = {
+                    "status": "failed",
+                    "response": f"transaction with {txnid} for amount {transaction_obj.amount} is failed via Easebuzz",
+                    "raw_callback": request.data
+                }
                 db_log.save()
 
             return redirect(

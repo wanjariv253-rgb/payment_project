@@ -14,24 +14,12 @@ class FetchRepaymentAPIView(APIView):
         if not agreement_no:
             return Response({"error": "agreement_no parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # ❌ HUMNE YAHAN SE MANUAL "Internal token trigger" WALA LOG HATA DIYA HAI
-
-        # 1. Third-party call (Actual AllCloud API hit)
+        # Third-party call
         data, error = AllCloudService.get_repayment(agreement_no, finance_id)
 
-        # 🔍 AB LOGIC SAMJHो: 
-        # ID 37 wala log database me AllCloudService ke andar banna shuru ho chuka hai.
-        # Hum database se sabse latest "Auth Token" ka log utha lenge jo abhi-abhi bana hai!
-        try:
-            parent_auth_log = GetPayment.objects.filter(type="Auth Token").latest('created_at')
-            parent_id = parent_auth_log.id
-        except GetPayment.DoesNotExist:
-            parent_id = None
-
         if error:
-            # 2.📑 Child log banao aur sahi parent se link karo
+            # Agar fail hua toh code 400 ya jo bhi return ho raha hai save karo
             GetPayment.objects.create(
-                parent_id=parent_id,  # 🔥 Sahi Auth Token se link ho gaya
                 type=PaymentLogTypes.GET_LOAN_DETAILS,
                 request_payload={"agreement_no": agreement_no, "finance_id": finance_id},
                 response_payload={"error": error},
@@ -39,21 +27,19 @@ class FetchRepaymentAPIView(APIView):
             )
             return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 2.📑 Child log banao aur sahi parent se link karo
+        # Success Log Entry with HTTP 200
         GetPayment.objects.create(
-            parent_id=parent_id,  # 🔥 Sahi Auth Token se link ho gaya
             type=PaymentLogTypes.GET_LOAN_DETAILS,
             request_payload={"agreement_no": agreement_no, "finance_id": finance_id},
             response_payload=data,
             status_code=200
         )
         
-        # Frontend ko response me real token ki ID bhej do
         return Response({
-            "parent_log_id": parent_id,  # 🔥 ID 37 wali actual token ID jayegi ab!
             "allcloud_data": data
         }, status=status.HTTP_200_OK)
-        
+
+
 # class CreatePaymentLogAPIView(APIView):
 #     """
 #     Method: POST | Type: PostLoanDetails

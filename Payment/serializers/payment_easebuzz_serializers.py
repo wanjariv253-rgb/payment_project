@@ -10,7 +10,10 @@ class TransactionEasebuzzSerializer(serializers.ModelSerializer):
     class Meta:
         model = Transaction_easebuzz
         fields = [ 'loan_ac_no', 'customer_name', 'city', 'amount', 'email', 'phone', 'productinfo' ]
-        
+        extra_kwargs = {
+            'city': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'productinfo': {'required': False, 'allow_blank': True, 'allow_null': True}
+        }
     def validate_customer_name(self, value):
         return sanitize_input(value, "customer_name")
     
